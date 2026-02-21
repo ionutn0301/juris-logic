@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tax Rules ──────────────────────────────────────────────────
+
+model TaxRuleRecord {
+  id               String   @id @default(uuid())
+  jurisdictionKey  String   // e.g., "US:CA:LOS_ANGELES"
+  country          String
+  region           String   // US, EU, UK, CA
+  state            String?
+  county           String?
+  city             String?
+  taxType          String   // SALES_TAX, VAT, GST, EXCISE, SERVICE_TAX
+  name             String
+  description      String
+  brackets         Json     // Array of { minAmount, maxAmount, rate }
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isActive         Boolean  @default(true)
+  priority         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([jurisdictionKey, isActive])
+  @@index([region, isActive])
+  @@map("tax_rules")
+}
+
+// ─── Commission Schedules ───────────────────────────────────────
+
+model CommissionRecord {
+  id               String   @id @default(uuid())
+  jurisdictionKey  String
+  country          String
+  region           String
+  state            String?
+  commissionType   String   // FLAT, PERCENTAGE, TIERED
+  name             String
+  description      String
+  flatAmount       Decimal? @db.Decimal(18, 4)
+  flatCurrency     String?
+  ratePercent      Decimal? @db.Decimal(8, 4)
+  tiers            Json?    // Array of { minAmount, maxAmount, ratePercent }
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([jurisdictionKey, isActive])
+  @@map("commissions")
+}
+
+// ─── Transaction Log ────────────────────────────────────────────
+
+model TransactionRecord {
+  id               String   @id @default(uuid())
+  subtotal         Decimal  @db.Decimal(18, 4)
+  taxAmount        Decimal  @db.Decimal(18, 4)
+  commissionAmount Decimal  @db.Decimal(18, 4)
+  total            Decimal  @db.Decimal(18, 4)
+  currency         String
+  jurisdictionKey  String
+  status           String   // PENDING, CALCULATED, FAILED
+  taxBreakdown     Json     // Array of { ruleName, ratePercent, amount }
+  metadata         Json?
+  calculatedAt     DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([jurisdictionKey])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// ─── Audit Log (Immutable) ──────────────────────────────────────
+
+model AuditLogRecord {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String
+  entityId   String
+  input      Json
+  output     Json
+  metadata   Json?
+  timestamp  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
